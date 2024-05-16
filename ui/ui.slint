@@ -1,0 +1,14 @@
+import { Button, GridBox, VerticalBox, HorizontalBox, AboutSlint } from "std-widgets.slint";
+
+
+export component UI inherits Window {
+    width: 240px;
+    height: 280px;
+    background: white;
+    animate background {
+         duration: 1s;
+    }
+    init => {
+        self.background = #f00;
+    }
+}
