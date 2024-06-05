@@ -117,6 +117,12 @@ pub async fn run(
         let button = PointerEventButton::Left;
         if let Some(event) = touch.read_one_touch_event(true).map(|record| {
             let position = slint::PhysicalPosition::new(record.x as _, record.y as _).to_logical(window.scale_factor());
+
+            unsafe {
+                LAST_TOUCH_POSITION = Some(position);
+                LAST_TOUCH_BUTTON = Some(button);
+                TOUCH_RELEASED_TIMES = 0;
+            }
             if unsafe { TOUCH_RELEASED } {
                 unsafe {
                     TOUCH_RELEASED = false;
@@ -124,9 +130,6 @@ pub async fn run(
                 return WindowEvent::PointerPressed { position, button };
             }
             unsafe {
-                LAST_TOUCH_POSITION = Some(position);
-                LAST_TOUCH_BUTTON = Some(button);
-                TOUCH_RELEASED_TIMES = 0;
                 TOUCH_RELEASED = false;
             }
             match record.action {
@@ -143,7 +146,7 @@ pub async fn run(
             window.dispatch_event(event);
         } else {
             if unsafe { !TOUCH_RELEASED } {
-                if unsafe { TOUCH_RELEASED_TIMES > 20 } {
+                if unsafe { TOUCH_RELEASED_TIMES > 10 } {
                     let event = WindowEvent::PointerReleased {
                         position: unsafe {LAST_TOUCH_POSITION.unwrap()},
                         button: unsafe {LAST_TOUCH_BUTTON.unwrap()},
