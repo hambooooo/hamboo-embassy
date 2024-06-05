@@ -1,13 +1,25 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
+
 use display_interface::WriteOnlyDataCommand;
-use embassy_time::Timer;
+use display_interface_spi::SPIInterface;
+use embassy_time::{Duration, Timer};
 use embedded_hal::digital::OutputPin;
-use embedded_hal::spi::SpiDevice;
+use embedded_hal_bus::spi::ExclusiveDevice;
+use esp_hal::delay::Delay;
+use esp_hal::gpio::{GpioPin, Output, PushPull};
+use esp_hal::peripherals::SPI3;
+use esp_hal::spi::FullDuplexMode;
+use esp_hal::spi::master::Spi;
 use esp_hal::systimer::SystemTimer;
 use mipidsi::Display;
 use mipidsi::models::ST7789;
-use slint::platform::software_renderer::{LineBufferProvider, MinimalSoftwareWindow, RepaintBufferType, Rgb565Pixel};
+use slint::platform::software_renderer::{
+    LineBufferProvider,
+    MinimalSoftwareWindow,
+    RepaintBufferType,
+    Rgb565Pixel,
+};
 
 slint::include_modules!();
 
@@ -67,7 +79,12 @@ impl<DI, RST> LineBufferProvider for &mut DrawBuffer<'_, Display<DI, ST7789, RST
 }
 
 #[embassy_executor::task]
-pub async fn run() {
+pub async fn run(display: Display<SPIInterface<ExclusiveDevice<Spi<'static, SPI3, FullDuplexMode>, GpioPin<Output<PushPull>, 16>, Delay>, GpioPin<Output<PushPull>, 17>>, ST7789, GpioPin<Output<PushPull>, 13>>) {
+    let mut buffer_provider = DrawBuffer {
+        display,
+        buffer: &mut [Rgb565Pixel(0); 240],
+    };
+
     let window = MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer);
     slint::platform::set_platform(Box::new(EspBackend { window: window.clone() }))
         .expect("backend already initialized");
@@ -75,20 +92,17 @@ pub async fn run() {
     let _demo = UI::new().unwrap();
 
     loop {
-        // slint::platform::update_timers_and_animations();
-        // window.draw_if_needed(|renderer| {
-        //     renderer.render_by_line(DisplayWrapper{
-        //         display: &mut display,
-        //         line_buffer: &mut line_buffer
-        //     });
-        // });
-        //
-        // if !window.has_active_animations() {
-        //     if let Some(duration) = slint::platform::duration_until_next_timer_update() {
-        //         Timer::after(Duration::from_millis(duration.as_millis() as u64)).await;
-        //         continue;
-        //     }
-        // }
-        Timer::after(embassy_time::Duration::from_millis(10)).await;
+        slint::platform::update_timers_and_animations();
+        window.draw_if_needed(|renderer| {
+            renderer.render_by_line(&mut buffer_provider);
+        });
+
+        if !window.has_active_animations() {
+            if let Some(duration) = slint::platform::duration_until_next_timer_update() {
+                Timer::after(Duration::from_millis(duration.as_millis() as u64)).await;
+                continue;
+            }
+        }
+        Timer::after(Duration::from_millis(10)).await;
     }
 }
