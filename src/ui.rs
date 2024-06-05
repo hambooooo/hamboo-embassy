@@ -4,6 +4,7 @@ use alloc::rc::Rc;
 use display_interface::WriteOnlyDataCommand;
 use display_interface_spi::SPIInterface;
 use embassy_time::{Duration, Timer};
+use embedded_graphics::prelude::OriginDimensions;
 use embedded_hal::digital::OutputPin;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_hal::delay::Delay;
@@ -85,11 +86,13 @@ pub async fn run(display: Display<SPIInterface<ExclusiveDevice<Spi<'static, SPI3
         buffer: &mut [Rgb565Pixel(0); 240],
     };
 
+    let size = slint::PhysicalSize::new(240, 280);
     let window = MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer);
+    window.set_size(size);
     slint::platform::set_platform(Box::new(EspBackend { window: window.clone() }))
         .expect("backend already initialized");
 
-    let _demo = UI::new().unwrap();
+    let _ui = UI::new().unwrap();
 
     loop {
         slint::platform::update_timers_and_animations();

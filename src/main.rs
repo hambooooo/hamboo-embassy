@@ -65,7 +65,7 @@ async fn main(spawner: Spawner) {
         &clocks,
     );
     let spi = spi.with_sck(clk).with_mosi(mosi);
-    // log::info!("spi init.");
+    log::info!("spi init.");
 
     let spi_device = ExclusiveDevice::new(spi, cs, delay);
     let di = SPIInterface::new(spi_device, dc);
@@ -77,6 +77,7 @@ async fn main(spawner: Spawner) {
         .invert_colors(ColorInversion::Inverted)
         .init(&mut delay)
         .unwrap();
+    log::info!("display init.");
 
     // spawner.spawn(bsp::wifi_start()).ok();
     spawner.spawn(hamboo::ui::run(display)).ok();

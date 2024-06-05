@@ -3,14 +3,12 @@ runner = "espflash flash --monitor"
 
 [env]
 ESP_LOGLEVEL = "INFO"
-SSID = "CHANGE_ME"
-PASSWORD = "CHANGE_ME"
 
 [build]
 rustflags = [
     "-C", "link-arg=-Tlinkall.x",
-    "-C", "link-arg=-Trom_functions.x",
-    "-C", "link-arg=-nostartfiles",
+#    "-C", "link-arg=-Trom_functions.x",
+#    "-C", "link-arg=-nostartfiles",
 ]
 
 target = "xtensa-esp32s3-none-elf"
