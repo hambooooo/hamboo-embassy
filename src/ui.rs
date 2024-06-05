@@ -1,15 +1,19 @@
 use alloc::boxed::Box;
 use alloc::rc::Rc;
+use cst816s::CST816S;
 
 use display_interface::WriteOnlyDataCommand;
 use display_interface_spi::SPIInterface;
 use embassy_time::{Duration, Timer};
 use embedded_graphics::prelude::OriginDimensions;
 use embedded_hal::digital::OutputPin;
+use embedded_hal_bus::i2c::RefCellDevice;
 use embedded_hal_bus::spi::ExclusiveDevice;
+use esp_hal::Blocking;
 use esp_hal::delay::Delay;
-use esp_hal::gpio::{GpioPin, Output, PushPull};
-use esp_hal::peripherals::SPI3;
+use esp_hal::gpio::{GpioPin, Input, Output, PullUp, PushPull};
+use esp_hal::i2c::I2C;
+use esp_hal::peripherals::{I2C1, SPI3};
 use esp_hal::spi::FullDuplexMode;
 use esp_hal::spi::master::Spi;
 use esp_hal::systimer::SystemTimer;
@@ -21,6 +25,7 @@ use slint::platform::software_renderer::{
     RepaintBufferType,
     Rgb565Pixel,
 };
+use slint::platform::WindowEvent;
 
 slint::include_modules!();
 
@@ -80,7 +85,10 @@ impl<DI, RST> LineBufferProvider for &mut DrawBuffer<'_, Display<DI, ST7789, RST
 }
 
 #[embassy_executor::task]
-pub async fn run(display: Display<SPIInterface<ExclusiveDevice<Spi<'static, SPI3, FullDuplexMode>, GpioPin<Output<PushPull>, 16>, Delay>, GpioPin<Output<PushPull>, 17>>, ST7789, GpioPin<Output<PushPull>, 13>>) {
+pub async fn run(
+    display: Display<SPIInterface<ExclusiveDevice<Spi<'static, SPI3, FullDuplexMode>, GpioPin<Output<PushPull>, 16>, Delay>, GpioPin<Output<PushPull>, 17>>, ST7789, GpioPin<Output<PushPull>, 13>>,
+    mut touch: CST816S<RefCellDevice<'static, I2C<'static, I2C1, Blocking>>, GpioPin<Input<PullUp>, 9>, GpioPin<Output<PushPull>, 10>>
+) {
     let mut buffer_provider = DrawBuffer {
         display,
         buffer: &mut [Rgb565Pixel(0); 240],
@@ -99,6 +107,29 @@ pub async fn run(display: Display<SPIInterface<ExclusiveDevice<Spi<'static, SPI3
         window.draw_if_needed(|renderer| {
             renderer.render_by_line(&mut buffer_provider);
         });
+
+        let button = slint::platform::PointerEventButton::Left;
+        if let Some(event) = touch.read_one_touch_event(true).map(|record| {
+            let position = slint::PhysicalPosition::new(record.x as _, record.y as _)
+                .to_logical(window.scale_factor());
+            esp_println::println!("{:?}", record);
+            match record.action {
+                0 => WindowEvent::PointerPressed { position, button },
+                1 => WindowEvent::PointerReleased { position, button },
+                2 => WindowEvent::PointerMoved { position },
+                _ => WindowEvent::PointerExited,
+            }
+        }) {
+            esp_println::println!("{:?}", event);
+            let is_pointer_release_event: bool =
+                matches!(event, WindowEvent::PointerReleased { .. });
+            window.dispatch_event(event);
+
+            // removes hover state on widgets
+            if is_pointer_release_event {
+                window.dispatch_event(WindowEvent::PointerExited);
+            }
+        }
 
         if !window.has_active_animations() {
             if let Some(duration) = slint::platform::duration_until_next_timer_update() {

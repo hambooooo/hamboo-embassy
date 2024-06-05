@@ -67,7 +67,7 @@ embedded-graphics = { version = "0.8.1" }
 embedded-hal = { version = "1.0.0" }
 embedded-hal-bus = { version = "0.1.0" }
 mipidsi = { git = "https://github.com/almindor/mipidsi", branch = "master" }
-
+cst816s = { git = "https://github.com/thecodechemist99/cst816s", branch = "master" }
 slint = { version = "1.6.0", default-features = false, features = ["compat-1-0", "libm", "unsafe-single-threaded"] }
 
 [build-dependencies]

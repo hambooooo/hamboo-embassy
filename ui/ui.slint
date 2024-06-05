@@ -4,6 +4,15 @@ import { Button, GridBox, VerticalBox, HorizontalBox, AboutSlint } from "std-wid
 export component UI inherits Window {
     width: 240px;
     height: 280px;
-    
+
     AboutSlint {}
+    
+    Button {
+        property <bool> is_clicked: false;
+        y: 150px;
+        text: self.is_clicked ? "cliked!" : "click me";
+        clicked => {
+            self.is_clicked = !self.is_clicked;
+        }
+    }
 }

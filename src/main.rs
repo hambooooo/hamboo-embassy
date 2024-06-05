@@ -4,16 +4,20 @@
 
 extern crate alloc;
 
+use core::cell::RefCell;
 use core::mem::MaybeUninit;
 
+use cst816s::CST816S;
 use display_interface_spi::SPIInterface;
 use embassy_executor::Spawner;
+use embedded_hal_bus::i2c::RefCellDevice;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use esp_backtrace as _;
 use esp_hal as hal;
 use hal::clock::ClockControl;
 use hal::embassy;
 use hal::gpio::IO;
+use hal::i2c::I2C;
 use hal::peripherals::Peripherals;
 use hal::prelude::*;
 use hal::spi::master::Spi;
@@ -21,6 +25,7 @@ use hal::spi::SpiMode;
 use mipidsi::Builder;
 use mipidsi::models::ST7789;
 use mipidsi::options::{ColorInversion, ColorOrder};
+use static_cell::make_static;
 
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
@@ -79,6 +84,24 @@ async fn main(spawner: Spawner) {
         .unwrap();
     log::info!("display init.");
 
+    let touch_int = io.pins.gpio9.into_pull_up_input();
+    let touch_rst = io.pins.gpio10.into_push_pull_output();
+    let i2c_sda = io.pins.gpio11;
+    let i2c_scl = io.pins.gpio12;
+
+    let i2c = I2C::new(peripherals.I2C1, i2c_sda, i2c_scl, 400u32.kHz(), &clocks, None);
+
+    // To share i2c bus, see @ https://github.com/rust-embedded/embedded-hal/issues/35
+    let i2c_ref_cell = RefCell::new(i2c);
+    let i2c_ref_cell = make_static!(i2c_ref_cell);
+
+    let mut touch = CST816S::new(
+        RefCellDevice::new(i2c_ref_cell),
+        touch_int,
+        touch_rst,
+    );
+    touch.setup(&mut delay).unwrap();
+
     // spawner.spawn(bsp::wifi_start()).ok();
-    spawner.spawn(hamboo::ui::run(display)).ok();
+    spawner.spawn(hamboo::ui::run(display, touch)).ok();
 }
