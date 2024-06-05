@@ -19,15 +19,21 @@ use esp_hal::spi::master::Spi;
 use esp_hal::systimer::SystemTimer;
 use mipidsi::Display;
 use mipidsi::models::ST7789;
+use slint::LogicalPosition;
 use slint::platform::software_renderer::{
     LineBufferProvider,
     MinimalSoftwareWindow,
     RepaintBufferType,
     Rgb565Pixel,
 };
-use slint::platform::WindowEvent;
+use slint::platform::{PointerEventButton, WindowEvent};
 
 slint::include_modules!();
+
+static mut TOUCH_RELEASED: bool = true;
+static mut TOUCH_RELEASED_TIMES: u32 = 0;
+static mut LAST_TOUCH_POSITION: Option<LogicalPosition> = None;
+static mut LAST_TOUCH_BUTTON: Option<PointerEventButton> = None;
 
 struct EspBackend {
     window: Rc<MinimalSoftwareWindow>,
@@ -108,26 +114,46 @@ pub async fn run(
             renderer.render_by_line(&mut buffer_provider);
         });
 
-        let button = slint::platform::PointerEventButton::Left;
+        let button = PointerEventButton::Left;
         if let Some(event) = touch.read_one_touch_event(true).map(|record| {
-            let position = slint::PhysicalPosition::new(record.x as _, record.y as _)
-                .to_logical(window.scale_factor());
-            esp_println::println!("{:?}", record);
+            let position = slint::PhysicalPosition::new(record.x as _, record.y as _).to_logical(window.scale_factor());
+            if unsafe { TOUCH_RELEASED } {
+                unsafe {
+                    TOUCH_RELEASED = false;
+                }
+                return WindowEvent::PointerPressed { position, button };
+            }
+            unsafe {
+                LAST_TOUCH_POSITION = Some(position);
+                LAST_TOUCH_BUTTON = Some(button);
+                TOUCH_RELEASED_TIMES = 0;
+                TOUCH_RELEASED = false;
+            }
             match record.action {
                 0 => WindowEvent::PointerPressed { position, button },
-                1 => WindowEvent::PointerReleased { position, button },
+                1 => {
+                    unsafe {TOUCH_RELEASED = true};
+                    WindowEvent::PointerReleased { position, button }
+                },
                 2 => WindowEvent::PointerMoved { position },
                 _ => WindowEvent::PointerExited,
             }
         }) {
-            esp_println::println!("{:?}", event);
-            let is_pointer_release_event: bool =
-                matches!(event, WindowEvent::PointerReleased { .. });
+            esp_println::println!("A ==> {:?}", event);
             window.dispatch_event(event);
-
-            // removes hover state on widgets
-            if is_pointer_release_event {
-                window.dispatch_event(WindowEvent::PointerExited);
+        } else {
+            if unsafe { !TOUCH_RELEASED } {
+                if unsafe { TOUCH_RELEASED_TIMES > 20 } {
+                    let event = WindowEvent::PointerReleased {
+                        position: unsafe {LAST_TOUCH_POSITION.unwrap()},
+                        button: unsafe {LAST_TOUCH_BUTTON.unwrap()},
+                    };
+                    esp_println::println!("B ==> {:?}", event);
+                    window.dispatch_event(event);
+                    unsafe {TOUCH_RELEASED = true};
+                    unsafe { TOUCH_RELEASED_TIMES = 0 };
+                }
+                unsafe { TOUCH_RELEASED_TIMES += 1 };
             }
         }
 
