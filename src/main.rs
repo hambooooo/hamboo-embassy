@@ -7,6 +7,7 @@ extern crate alloc;
 use core::cell::RefCell;
 use core::mem::MaybeUninit;
 
+use axp2101::{Axp2101, I2CPowerManagementInterface};
 use cst816s::CST816S;
 use display_interface_spi::SPIInterface;
 use embassy_executor::Spawner;
@@ -25,6 +26,7 @@ use hal::spi::SpiMode;
 use mipidsi::Builder;
 use mipidsi::models::ST7789;
 use mipidsi::options::{ColorInversion, ColorOrder};
+use pcf8563::PCF8563;
 use static_cell::make_static;
 
 #[global_allocator]
@@ -102,6 +104,12 @@ async fn main(spawner: Spawner) {
     );
     touch.setup(&mut delay).unwrap();
 
+    let i2c_power_management_interface = I2CPowerManagementInterface::new(RefCellDevice::new(i2c_ref_cell));
+    let mut axp2101 = Axp2101::new(i2c_power_management_interface);
+    axp2101.init().unwrap();
+
+    let rtc = PCF8563::new(RefCellDevice::new(i2c_ref_cell));
+
     // spawner.spawn(bsp::wifi_start()).ok();
-    spawner.spawn(hamboo::ui::run(display, touch)).ok();
+    spawner.spawn(hamboo::ui::run(display, touch, axp2101, rtc)).ok();
 }

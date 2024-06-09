@@ -1,22 +1,12 @@
 import { Button, GridBox, VerticalBox, HorizontalBox, AboutSlint } from "std-widgets.slint";
 import { StatusBar } from "./status-bar.slint";
 import { Apps } from "./apps.slint";
+import { Settings } from "./settings.slint";
+import { Router, Battery, DateTime, System } from "./global.slint";
+import { FaceHamboo } from "./face-hamboo.slint";
 import "./fonts/simhei.ttf";
 
-export global DateTime  {
-    in property <int> year;
-    in property <int> month;
-    in property <int> weekday;
-    in property <int> day;
-    in property <int> hours;
-    in property <int> minutes;
-    in property <int> seconds;
-}
-
-export global Battery  {
-    in property <bool> charging : false;
-    in property <int> percent : 100;
-}
+export { Router, Battery, DateTime, System }
 
 export component UI inherits Window {
     default-font-family: "黑体";
@@ -26,17 +16,8 @@ export component UI inherits Window {
     status_bar := StatusBar {
         property <bool> moved: false;
         property <duration> animate_time : 0;
-        battery-percent: Battery.percent;
-        battery-charging: Battery.charging;
-        date-year: DateTime.year;
-        date-month: DateTime.month;
-        date-weekday: DateTime.weekday;
-        date-day: DateTime.day;
-        time-hours: DateTime.hours;
-        time-minutes: DateTime.minutes;
-        time-seconds: DateTime.seconds;
         visible: false;
-        y: -280px;
+        y: root.height * -1;
         z: 1;
         animate y, opacity {
             duration: self.animate_time;
@@ -54,7 +35,7 @@ export component UI inherits Window {
                 if (event.kind == PointerEventKind.up && status-bar.moved) {
                     status-bar.animate_time = 200ms;
                     status-bar.moved = false;
-                    status-bar.y = -280px;
+                    status-bar.y = root.height * -1;
                     home.visible = true;
                     status-bar.opacity = 0;
                     home.opacity = 1;
@@ -64,60 +45,32 @@ export component UI inherits Window {
     }
     apps := Apps {
         property <duration> animate_time : 0;
+        property <bool> is_moved: false;
         visible: false;
-        y: 280px;
+        y: root.height;
         z: 1;
         animate y, opacity {
             duration: self.animate_time;
         }
-    }
-    home := Rectangle {
-        opacity: 1;
-        z: 0;
-        Image {
-            height: root.height;
-            width: root.width;
-            source: @image-url("./images/hamboo.jpg");
-            date := Text {
-                visible: root.datetime_show;
-                x: root.width - self.width - 5px;
-                y: (root.height - self.height) / 7;
-                text: @tr("{}th Apr", DateTime.month);
-                font-size: 20px;
-                color: gold;
-            }
-            Rectangle{
-                visible: root.datetime_show;
-                x: 120px;
-                y: 50px;
-                width: 140px;
-                height: 60px;
-                hours := Text {
-                    x: 0px;
-                    text: DateTime.hours;
-                    font-size: 45px;
-                    font-weight: 800;
-                    color: #fff;
-                }
-                seconds := Text {
-                    x: hours.width + 2px;
-                    y: (parent.height - self.height) / 2  - 2px;
-                    text: ":";
-                    font-size: 40px;
-                    font-weight: 700;
-                    color: #fff;
-                }
-                minutes := Text {
-                    x: seconds.x + seconds.width + 2px;
-                    text: DateTime.minutes;
-                    font-size: 45px;
-                    font-weight: 800;
-                    color: #fff;
+        TouchArea {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 20%;
+            z: 1;
+            moved => {
+                if (parent.flick-y == 0 && self.mouse_y - self.pressed_y > 10px) {
+                    home.visible = true;
+                    home.opacity = 1;
+                    parent.visible = false;
+                    parent.is_moved = true;
                 }
             }
         }
+    }
+    home := FaceHamboo {
         TouchArea {
-            x: -0px;
+            x: 0;
             property <bool> is_moved: false;
             property <int> moved_direction: 1;
             moved => {
@@ -125,10 +78,9 @@ export component UI inherits Window {
                     status-bar.visible = true;
                     status-bar.opacity = 1;
                     status-bar.animate_time = 0;
-                    status-bar.y = -280px + self.mouse_y;
+                    status-bar.y = self.mouse_y - root.height;
                     self.is_moved = true;
                     self.moved_direction = 1;
-                    //home.opacity = (root.height - self.mouse_y) / root.height;
                 }
                 if (self.pressed_y > root.height - 50px) {
                     apps.visible = true;
@@ -137,7 +89,6 @@ export component UI inherits Window {
                     apps.y = self.mouse_y;
                     self.is_moved = true;
                     self.moved_direction = 2;
-                    //home.opacity = (root.height - self.mouse_y) / root.height;
                 }
             }
             pointer-event(event) => {
@@ -145,7 +96,7 @@ export component UI inherits Window {
                     self.is_moved = false;
                     status-bar.animate_time = 200ms;
                     if (self.mouse_y < root.height / 2) {
-                        status-bar.y = -280px;
+                        status-bar.y = root.height * -1;
                         status-bar.opacity = 0;
                         home.visible = true;
                         home.opacity = 1;
@@ -158,7 +109,7 @@ export component UI inherits Window {
                     self.is_moved = false;
                     apps.animate_time = 200ms;
                     if (self.mouse_y > root.height / 2) {
-                        apps.y = 280px;
+                        apps.y = root.height;
                         apps.opacity = 0;
                         home.visible = true;
                         home.opacity = 1;
@@ -169,5 +120,8 @@ export component UI inherits Window {
                 }
             }
         }
+    }
+    settings:= Settings {
+        visible: System.current-page == Router.Settings;
     }
 }
