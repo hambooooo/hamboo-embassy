@@ -64,6 +64,9 @@ export component StatusBar inherits Rectangle {
                 width: 20px;
                 source: @image-url("./images/icon-brightness.svg");
             }
+            on-value-change(value) => {
+                System.brightness-change(value);
+            }
         }
         Slider {
             width: 220px;

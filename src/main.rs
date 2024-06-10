@@ -29,6 +29,8 @@ use mipidsi::options::{ColorInversion, ColorOrder};
 use pcf8563::PCF8563;
 use static_cell::make_static;
 
+use hal::mcpwm::{operator::PwmPinConfig, timer::PwmWorkingMode, PeripheralClockConfig, MCPWM};
+
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 
@@ -61,9 +63,22 @@ async fn main(spawner: Spawner) {
     let rst = io.pins.gpio13.into_push_pull_output();
     let clk = io.pins.gpio15.into_push_pull_output();
     let mosi = io.pins.gpio14.into_push_pull_output();
-    let mut bl = io.pins.gpio18.into_push_pull_output();
+    let bl = io.pins.gpio18.into_push_pull_output();
+    // bl.set_high();
 
-    bl.set_high();
+    let clock_cfg = PeripheralClockConfig::with_frequency(&clocks, 40u32.MHz()).unwrap();
+    let mut mcpwm = MCPWM::new(peripherals.MCPWM0, clock_cfg);
+    mcpwm.operator0.set_timer(&mcpwm.timer0);
+    let mut bl_pwm_pin = mcpwm
+        .operator0
+        .with_pin_a(bl, PwmPinConfig::UP_ACTIVE_HIGH);
+    // start timer with timestamp values in the range of 0..=99 and a frequency of 20 kHz
+    let timer_clock_cfg = clock_cfg
+        .timer_clock_with_frequency(99, PwmWorkingMode::Increase, 20u32.kHz())
+        .unwrap();
+    mcpwm.timer0.start(timer_clock_cfg);
+    // pin will be high 50% of the time
+    bl_pwm_pin.set_timestamp(50);
 
     let spi = Spi::new(
         peripherals.SPI3,
@@ -111,5 +126,5 @@ async fn main(spawner: Spawner) {
     let rtc = PCF8563::new(RefCellDevice::new(i2c_ref_cell));
 
     // spawner.spawn(bsp::wifi_start()).ok();
-    spawner.spawn(hamboo::ui::run(display, touch, axp2101, rtc)).ok();
+    spawner.spawn(hamboo::ui::run(display, touch, axp2101, rtc, bl_pwm_pin)).ok();
 }

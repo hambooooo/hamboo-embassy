@@ -17,6 +17,8 @@ export global System {
     in-out property <bool> bluetools-enable : false;
     in-out property <int> brightness : 50;
     in-out property <int> volume : 30;
+
+    pure callback brightness-change(int);
 }
 
 export global Battery  {

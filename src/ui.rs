@@ -13,7 +13,8 @@ use esp_hal::Blocking;
 use esp_hal::delay::Delay;
 use esp_hal::gpio::{GpioPin, Input, Output, PullUp, PushPull};
 use esp_hal::i2c::I2C;
-use esp_hal::peripherals::{I2C1, SPI3};
+use esp_hal::mcpwm::operator::PwmPin;
+use esp_hal::peripherals::{I2C1, MCPWM0, SPI3};
 use esp_hal::spi::FullDuplexMode;
 use esp_hal::spi::master::Spi;
 use esp_hal::systimer::SystemTimer;
@@ -97,6 +98,7 @@ pub async fn run(
     mut touch: CST816S<RefCellDevice<'static, I2C<'static, I2C1, Blocking>>, GpioPin<Input<PullUp>, 9>, GpioPin<Output<PushPull>, 10>>,
     mut axp2101: Axp2101<I2CInterface<RefCellDevice<'static, I2C<'static, I2C1, Blocking>>>>,
     mut rtc: PCF8563<RefCellDevice<'static, I2C<'static, I2C1, Blocking>>>,
+    mut bl_pwm_pin: PwmPin<'static, GpioPin<Output<PushPull>, 18>, MCPWM0, 0, true>
 ) {
     let mut buffer_provider = DrawBuffer {
         display,
@@ -127,6 +129,11 @@ pub async fn run(
         update_datetime(&mut rtc, app_weak.clone());
     });
 
+    // 控制屏幕亮度
+    ui.global::<System>().on_brightness_change(move |value| {
+        bl_pwm_pin.set_timestamp((value as f32 * 0.9 + 10.0) as u16);
+    });
+
     // 处理触摸屏问题
     let touch_timer = slint::Timer::default();
     let window_copy = window.clone();
@@ -154,7 +161,7 @@ pub async fn run(
             window_copy.dispatch_event(event);
         } else {
             if unsafe { !TOUCH_RELEASED } {
-                if unsafe { TOUCH_RELEASED_TIMES > 100 } {
+                if unsafe { TOUCH_RELEASED_TIMES > 10 } {
                     let event = WindowEvent::PointerReleased {
                         position: unsafe { LAST_TOUCH_POSITION.unwrap() },
                         button: unsafe { LAST_TOUCH_BUTTON.unwrap() },

@@ -4,6 +4,7 @@ export component Slider inherits Rectangle {
     in-out property<float> maximum: 100;
     in-out property<float> minimum: 0;
     in-out property<float> value;
+    callback on-value-change(float);
 
     min-height: 24px;
     min-width: 100px;
@@ -38,7 +39,7 @@ export component Slider inherits Rectangle {
         moved => {
             if (self.enabled && self.pressed) {
                 root.value = max(root.minimum, min(root.maximum, self.pressed-value + (touch.mouse-x - touch.pressed-x) * (root.maximum - root.minimum) / root.width));
-
+                root.on-value-change(root.value);
             }
         }
     }
